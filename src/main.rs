@@ -1,5 +1,5 @@
 use std::{io::{Stdout, Write, stdout}, time::{Duration, Instant}};
-use crossterm::{QueueableCommand, cursor::{self, MoveTo}, event::{Event, KeyCode, KeyEventKind, poll, read}, execute, style::{Color, Print, ResetColor, SetBackgroundColor}, terminal::{self, Clear, ClearType, enable_raw_mode}};
+use crossterm::{QueueableCommand, cursor::{self, MoveTo}, event::{Event, KeyCode, KeyEventKind, poll, read}, execute, style::{self, Color, Print, ResetColor, SetBackgroundColor, Stylize}, terminal::{self, Clear, ClearType, enable_raw_mode}};
 
 enum Direction {
     Up,
@@ -26,7 +26,7 @@ impl Snake {
                 x,
                 y
             },
-            body: Vec::new()
+            body: vec![Position { x: x - 1, y }]
         }
     }
 
@@ -73,6 +73,7 @@ impl Apple {
 struct GameState {
     snake: Snake,
     apple: Apple,
+    score: u32,
     direction: Direction
 }
 
@@ -81,6 +82,7 @@ impl GameState {
         GameState {
             snake: Snake::new(max_x / 2, max_y / 2),
             apple: Apple::new(max_x, max_y),
+            score: 0,
             direction: Direction::Right
         }
     }
@@ -89,6 +91,8 @@ impl GameState {
         if self.apple.position == self.snake.position {
             self.apple.regenrate();
             self.snake.move_snake(&self.direction, true);
+
+            self.score += 1;
         } else {
             self.snake.move_snake(&self.direction, false);
         }
@@ -119,6 +123,12 @@ impl Renderer {
         }
     }
 
+    fn write(&mut self, text: &str, x: u16, y: u16) {
+        self.stdout
+          .queue(cursor::MoveTo(x,y)).unwrap()
+          .queue(style::PrintStyledContent(text.red())).unwrap();
+    }
+
     fn clear(&mut self) {
         self.stdout.queue(Clear(ClearType::All)).unwrap();
     }
@@ -146,6 +156,8 @@ fn main() {
     let mut last_tick = Instant::now();
 
     'game: loop {
+        render.write("", 0, 0);
+
         while poll(Duration::ZERO).unwrap() {
             match read().unwrap() {
                 Event::Key(key) if key.kind == KeyEventKind::Press => {
@@ -163,16 +175,17 @@ fn main() {
         }
 
         if last_tick.elapsed() >= tick_rate {
-            last_tick += tick_rate;
-
             render.flush();
 
+            last_tick += tick_rate;
+
+            render.clear();
+
+            render.write(&format!("Score: {}", game.score).to_string(), 4, 2);
 
             game.update();
 
             render.update(&game);
-            render.clear();
-
         }
     }
 
