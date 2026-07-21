@@ -1,5 +1,5 @@
-use std::{io::{Stdout, Write, stdout}, time::Duration};
-use crossterm::{QueueableCommand, cursor::{self, MoveTo}, event::{Event, KeyCode, poll, read}, execute, style::{Color, Print, ResetColor, SetBackgroundColor}, terminal::{self, Clear, ClearType, enable_raw_mode}};
+use std::{io::{Stdout, Write, stdout}, time::{Duration, Instant}};
+use crossterm::{QueueableCommand, cursor::{self, MoveTo}, event::{Event, KeyCode, KeyEventKind, poll, read}, execute, style::{Color, Print, ResetColor, SetBackgroundColor}, terminal::{self, Clear, ClearType, enable_raw_mode}};
 
 enum Direction {
     Up,
@@ -142,27 +142,38 @@ fn main() {
 
     let mut game = GameState::new(cols / 2, rows);
 
-    loop {
-        if poll(Duration::from_millis(100)).unwrap() {
-             if let Event::Key(event) = read().unwrap() {
-                 match event.code {
-                     KeyCode::Char('w') => game.direction = Direction::Up,
-                     KeyCode::Char('s') => game.direction = Direction::Down,
-                     KeyCode::Char('a') => game.direction = Direction::Left,
-                     KeyCode::Char('d') => game.direction = Direction::Right,
-                     KeyCode::Esc => break,
-                     _ => {}
+    let tick_rate = Duration::from_millis(100);
+    let mut last_tick = Instant::now();
+
+    'game: loop {
+        while poll(Duration::ZERO).unwrap() {
+            match read().unwrap() {
+                Event::Key(key) if key.kind == KeyEventKind::Press => {
+                    match key.code {
+                        KeyCode::Char('w') => game.direction = Direction::Up,
+                        KeyCode::Char('a') => game.direction = Direction::Left,
+                        KeyCode::Char('s') => game.direction = Direction::Down,
+                        KeyCode::Char('d') => game.direction = Direction::Right,
+                        KeyCode::Esc => break 'game,
+                        _ => {}
+                    }
                 }
+                _ => {}
             }
         }
 
-        render.flush();
+        if last_tick.elapsed() >= tick_rate {
+            last_tick += tick_rate;
+
+            render.flush();
 
 
-        game.update();
+            game.update();
 
-        render.update(&game);
-        render.clear();
+            render.update(&game);
+            render.clear();
+
+        }
     }
 
     render.clear();
