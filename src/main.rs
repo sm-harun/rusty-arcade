@@ -30,14 +30,6 @@ impl Snake {
         }
     }
 
-    fn draw_snake(&self, stdout: &mut Stdout) {
-        draw_cell(stdout, self.position.x, self.position.y);
-
-        for cell in &self.body {
-            draw_cell(stdout, cell.x, cell.y);
-        }
-    }
-
     fn move_snake(&mut self, direction: &Direction, eating: bool) {
         self.body.insert(0, self.position.clone());
 
@@ -72,10 +64,6 @@ impl Apple {
         }
     }
 
-    fn draw(&self, stdout: &mut Stdout) {
-        execute!(stdout, MoveTo(self.position.x * 2, self.position.y), SetBackgroundColor(Color::Red), Print("  "), ResetColor).unwrap();
-    }
-    
     fn regenrate(&mut self) {
         self.position.x = rand::random_range(0..=self.max_x);
         self.position.y = rand::random_range(0..=self.max_y);
@@ -90,17 +78,14 @@ struct GameState {
 
 impl GameState {
     fn new(max_x: u16, max_y: u16) -> GameState {
-        return GameState {
+        GameState {
             snake: Snake::new(max_x / 2, max_y / 2),
             apple: Apple::new(max_x, max_y),
             direction: Direction::Right
-        };
+        }
     }
 
-    fn update(&mut self, stdout: &mut Stdout) {
-        self.apple.draw(stdout);
-        self.snake.draw_snake(stdout);
-
+    fn update(&mut self) {
         if self.apple.position == self.snake.position {
             self.apple.regenrate();
             self.snake.move_snake(&self.direction, true);
@@ -110,52 +95,77 @@ impl GameState {
     }
 }
 
+struct Renderer {
+    stdout: Stdout
+}
+
+impl Renderer {
+    fn new() -> Renderer {
+        Renderer {
+            stdout: stdout()
+        }
+    }
+
+    fn draw_cell(&mut self, x: u16, y: u16, color: Color) {
+        execute!(self.stdout, MoveTo(x * 2, y), SetBackgroundColor(color), Print("  "), ResetColor).unwrap();
+    }
+
+    fn update(&mut self, game: &GameState) {
+        self.draw_cell(game.apple.position.x, game.apple.position.y, Color::Red);
+        self.draw_cell(game.snake.position.x, game.snake.position.y, Color::Green);
+
+        for cell in &game.snake.body {
+            self.draw_cell(cell.x, cell.y, Color::Blue);
+        }
+    }
+
+    fn clear(&mut self) {
+        self.stdout.queue(Clear(ClearType::All)).unwrap();
+    }
+
+    fn flush(&mut self) {
+        self.stdout.flush().unwrap();
+    }
+
+    fn hide_cursor(&mut self) {
+        self.stdout.queue(cursor::Hide).unwrap();
+    }
+}
+
 fn main() {
     enable_raw_mode().unwrap();
 
     let (cols, rows) = terminal::size().unwrap();
-    let mut stdout = stdout();
-    stdout.queue(cursor::Hide).unwrap();
+
+    let mut render = Renderer::new();
+    render.hide_cursor();
 
     let mut game = GameState::new(cols / 2, rows);
 
     loop {
         if poll(Duration::from_millis(100)).unwrap() {
-            match read().unwrap() {
-                Event::Key(event) => {
-                    match event.code {
-                        KeyCode::Char('w') => game.direction = Direction::Up,
-                        KeyCode::Char('s') => game.direction = Direction::Down,
-                        KeyCode::Char('a') => game.direction = Direction::Left,
-                        KeyCode::Char('d') => game.direction = Direction::Right,
-                        KeyCode::Esc => break,
-                        _ => {}
-                    }
-                },
-                _ => print!("Random Event")
+             if let Event::Key(event) = read().unwrap() {
+                 match event.code {
+                     KeyCode::Char('w') => game.direction = Direction::Up,
+                     KeyCode::Char('s') => game.direction = Direction::Down,
+                     KeyCode::Char('a') => game.direction = Direction::Left,
+                     KeyCode::Char('d') => game.direction = Direction::Right,
+                     KeyCode::Esc => break,
+                     _ => {}
+                }
             }
         }
 
-        stdout.flush().unwrap();
+        render.flush();
 
-        game.update(&mut stdout);
 
-        clear_terminal(&mut stdout);
+        game.update();
+
+        render.update(&game);
+        render.clear();
     }
 
-    clear_terminal(&mut stdout);
-    goto(&mut stdout, 0, 0);
-    stdout.flush().unwrap();
+    render.clear();
+    render.flush();
 }
 
-fn clear_terminal(stdout: &mut Stdout) {
-    stdout.queue(Clear(ClearType::All)).unwrap();
-}
-
-fn goto(stdout: &mut Stdout, x: u16, y: u16) {
-    stdout.queue(cursor::MoveTo(x, y)).unwrap();
-}
-
-fn draw_cell(stdout: &mut Stdout, x: u16, y: u16) {
-    execute!(stdout, MoveTo(x * 2, y), SetBackgroundColor(Color::Blue), Print("  "), ResetColor).unwrap();
-}
