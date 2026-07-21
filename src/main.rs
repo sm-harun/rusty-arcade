@@ -82,35 +82,52 @@ impl Apple {
     }
 }
 
+struct GameState {
+    snake: Snake,
+    apple: Apple,
+    direction: Direction
+}
+
+impl GameState {
+    fn new(max_x: u16, max_y: u16) -> GameState {
+        return GameState {
+            snake: Snake::new(max_x / 2, max_y / 2),
+            apple: Apple::new(max_x, max_y),
+            direction: Direction::Right
+        };
+    }
+
+    fn update(&mut self, stdout: &mut Stdout) {
+        self.apple.draw(stdout);
+        self.snake.draw_snake(stdout);
+
+        if self.apple.position == self.snake.position {
+            self.apple.regenrate();
+            self.snake.move_snake(&self.direction, true);
+        } else {
+            self.snake.move_snake(&self.direction, false);
+        }
+    }
+}
+
 fn main() {
     enable_raw_mode().unwrap();
 
     let (cols, rows) = terminal::size().unwrap();
-
     let mut stdout = stdout();
-    clear_terminal(&mut stdout);
     stdout.queue(cursor::Hide).unwrap();
 
-    let max_x = cols / 2;
-    let max_y = rows;
-
-    let mut snake = Snake::new(max_x / 2, max_y / 2);
-    let mut apple = Apple::new(max_x, max_y);
-
-    let mut direction = Direction::Right;
+    let mut game = GameState::new(cols / 2, rows);
 
     loop {
-        clear_terminal(&mut stdout);
-
         if poll(Duration::from_millis(100)).unwrap() {
             match read().unwrap() {
                 Event::Key(event) => {
                     match event.code {
-                        KeyCode::Char('w') => direction = Direction::Up,
-                        KeyCode::Char('s') => direction = Direction::Down,
-                        KeyCode::Char('a') => direction = Direction::Left,
-                        KeyCode::Char('d') => direction = Direction::Right,
-                        KeyCode::Char('g') => apple.regenrate(),
+                        KeyCode::Char('w') => game.direction = Direction::Up,
+                        KeyCode::Char('s') => game.direction = Direction::Down,
+                        KeyCode::Char('a') => game.direction = Direction::Left,
+                        KeyCode::Char('d') => game.direction = Direction::Right,
                         KeyCode::Esc => break,
                         _ => {}
                     }
@@ -121,17 +138,9 @@ fn main() {
 
         stdout.flush().unwrap();
 
-        apple.draw(&mut stdout);
-        snake.draw_snake(&mut stdout);
+        game.update(&mut stdout);
 
-        if apple.position == snake.position {
-            apple.regenrate();
-            snake.move_snake(&direction, true);
-        } else {
-            snake.move_snake(&direction, false);
-        }
-
-
+        clear_terminal(&mut stdout);
     }
 
     clear_terminal(&mut stdout);
