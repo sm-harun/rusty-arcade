@@ -1,6 +1,7 @@
 use std::{io::{Stdout, Write, stdout}, time::{Duration, Instant}};
 use crossterm::{QueueableCommand, cursor::{self, MoveTo}, event::{Event, KeyCode, KeyEventKind, poll, read}, execute, style::{self, Color, Print, ResetColor, SetBackgroundColor, Stylize}, terminal::{self, Clear, ClearType, enable_raw_mode}};
 
+#[derive(PartialEq, Eq)]
 enum Direction {
     Up,
     Down,
@@ -24,6 +25,7 @@ struct Position {
 struct Snake {
     position: Position,
     body: Vec<Position>,
+    direction: Direction,
     max_x: u16,
     max_y: u16
 }
@@ -35,25 +37,34 @@ impl Snake {
                 x,
                 y
             },
+            direction: Direction::Right,
             body: vec![Position { x: x - 1, y }],
             max_x,
             max_y
         }
     }
 
-    fn move_snake(&mut self, direction: &Direction) {
+    fn move_snake(&mut self) {
         self.body.insert(0, self.position.clone());
 
-        match direction {
+        match self.direction {
             Direction::Up => if self.position.y != 0 { self.position.y -= 1 },
             Direction::Down => if self.position.y != self.max_y { self.position.y += 1 },
             Direction::Left => if self.position.x != 0 { self.position.x -= 1 },
             Direction::Right => if self.position.x != self.max_x { self.position.x += 1 }
         }
 
-        // print!("  X: {}", self.position.x);
-        // print!("  Y: {}", self.position.y);
+        print!("  X: {}", self.position.x);
+        print!("  Y: {}", self.position.y);
+    }
 
+    fn change_direction(&mut self, direction: Direction) {
+        match direction {
+            Direction::Up => if self.direction != Direction::Down { self.direction = Direction::Up },
+            Direction::Down => if self.direction != Direction::Up { self.direction = Direction::Down },
+            Direction::Right => if self.direction != Direction::Left { self.direction = Direction::Right },
+            Direction::Left => if self.direction != Direction::Right { self.direction = Direction::Left },
+        }
     }
 
     fn remove_last_cell(&mut self) {
@@ -89,7 +100,6 @@ struct SnakeGame {
     snake: Snake,
     apple: Apple,
     score: u32,
-    direction: Direction,
     state: GameState,
     max_x: u16,
     max_y: u16
@@ -101,7 +111,6 @@ impl SnakeGame {
             snake: Snake::new(max_x / 2, max_y / 2, max_x, max_y),
             apple: Apple::new(max_x, max_y),
             score: 0,
-            direction: Direction::Right,
             state: GameState::Over,
             max_x,
             max_y
@@ -112,7 +121,6 @@ impl SnakeGame {
         self.snake = Snake::new(self.max_x / 2, self.max_y / 2, self.max_x, self.max_y);
         self.apple = Apple::new(self.max_x, self.max_y);
         self.score = 0;
-        self.direction = Direction::Right;
 
         self.state = GameState::Running;
     }
@@ -136,7 +144,7 @@ impl SnakeGame {
             self.end_game();
         }
 
-        self.snake.move_snake(&self.direction);
+        self.snake.move_snake();
 
         if self.apple.position == self.snake.position {
             self.apple.regenrate();
@@ -174,7 +182,7 @@ impl Renderer {
                   ██████   █████  ███    ███ ███████     ███████ ██   ██ ████████ ██████  
                  ██       ██   ██ ████  ████ ██          ██   ██ ██   ██ ██       ██   ██ 
                  ██   ███ ███████ ██ ████ ██ █████       ██   ██ ██   ██ ████████ ██████  
-                 ██    ██ ██   ██ ██  ██  ██ ██          ██   ██  █   █  ██       ██   ██ 
+                 ██    ██ ██   ██ ██  ██  ██ ██          ██   ██  ██ ██  ██       ██   ██ 
                   ██████  ██   ██ ██      ██ ███████     ███████   ███    ███████ ██   ██ 
             ";
             let text = text.replace('\n', "\r\n");
@@ -247,10 +255,10 @@ fn main() {
             match read().unwrap() {
                 Event::Key(key) if key.kind == KeyEventKind::Press => {
                     match key.code {
-                        KeyCode::Char('w') => game.direction = Direction::Up,
-                        KeyCode::Char('a') => game.direction = Direction::Left,
-                        KeyCode::Char('s') => game.direction = Direction::Down,
-                        KeyCode::Char('d') => game.direction = Direction::Right,
+                        KeyCode::Char('w') => game.snake.change_direction(Direction::Up),
+                        KeyCode::Char('a') => game.snake.change_direction(Direction::Left),
+                        KeyCode::Char('s') => game.snake.change_direction(Direction::Down),
+                        KeyCode::Char('d') => game.snake.change_direction(Direction::Right),
                         KeyCode::Enter => {
                             if game.state == GameState::Over {
                                 game.start_game();
