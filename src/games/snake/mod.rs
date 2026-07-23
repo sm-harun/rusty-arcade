@@ -214,20 +214,21 @@ impl SnakeGame {
 
 impl Renderable for SnakeGame {
     fn render(&self, renderer: &mut impl Renderer) {
+        renderer.clear();
+
         if self.state == GameState::Over {
             let text = "
-                  ██████   █████  ███    ███ ███████     ███████ ██   ██ ████████ ██████  
-                 ██       ██   ██ ████  ████ ██          ██   ██ ██   ██ ██       ██   ██ 
-                 ██   ███ ███████ ██ ████ ██ █████       ██   ██ ██   ██ ████████ ██████  
-                 ██    ██ ██   ██ ██  ██  ██ ██          ██   ██  ██ ██  ██       ██   ██ 
-                  ██████  ██   ██ ██      ██ ███████     ███████   ███    ███████ ██   ██ 
+ ██████   █████  ███    ███ ███████     ███████ ██   ██ ████████ ██████ 
+██       ██   ██ ████  ████ ██          ██   ██ ██   ██ ██       ██   ██
+██   ███ ███████ ██ ████ ██ █████       ██   ██ ██   ██ ████████ ██████ 
+██    ██ ██   ██ ██  ██  ██ ██          ██   ██  ██ ██  ██       ██   ██
+ ██████  ██   ██ ██      ██ ███████     ███████   ███    ███████ ██   ██
             ";
-            let text = text.replace('\n', "\r\n");
 
-            renderer.write_text(self.max_x, 1, Color::White, &text.to_string());
+            renderer.write_text(self.max_x / 2, self.max_y / 3, Color::White, &text.to_string());
+            renderer.write_text(self.max_x / 2, self.max_y / 2, Color::White, &format!("Score: {}", self.score).to_string(),);
 
-            renderer.write_text(16, 8, Color::White,&format!("Score: {}", self.score).to_string(),);
-
+            renderer.flush();
             return ();
         }
 
@@ -239,15 +240,13 @@ impl Renderable for SnakeGame {
         }
 
         if self.state == GameState::Paused {
-
             let text = "
-                  ██████   █████  ███    ███ ███████     ██████   █████  ██    ██ ███████ ███████ ██████ 
-                 ██       ██   ██ ████  ████ ██          ██   ██ ██   ██ ██    ██ ██      ██      ██   ██
-                 ██   ███ ███████ ██ ████ ██ █████       ██████  ███████ ██    ██ ███████ █████   ██   ██
-                 ██    ██ ██   ██ ██  ██  ██ ██          ██      ██   ██ ██    ██      ██ ██      ██   ██
-                  ██████  ██   ██ ██      ██ ███████     ██      ██   ██  ██████  ███████ ███████ ██████
+ ██████   █████  ███    ███ ███████     ██████   █████  ██    ██ ███████ ███████ ██████ 
+██       ██   ██ ████  ████ ██          ██   ██ ██   ██ ██    ██ ██      ██      ██   ██
+██   ███ ███████ ██ ████ ██ █████       ██████  ███████ ██    ██ ███████ █████   ██   ██
+██    ██ ██   ██ ██  ██  ██ ██          ██      ██   ██ ██    ██      ██ ██      ██   ██
+ ██████  ██   ██ ██      ██ ███████     ██      ██   ██  ██████  ███████ ███████ ██████
             ";
-            let text = text.replace('\n', "\r\n");
 
             renderer.write_text(self.max_x / 2, self.max_y / 2, Color::White, &text.to_string());
         }

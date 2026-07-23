@@ -4,12 +4,7 @@ use std::{
     }
 };
 
-use crossterm::{
-    event::{
-        Event, KeyCode, KeyEventKind, poll, read
-    },
-    terminal
-};
+use crossterm::event::{ Event, KeyCode, KeyEventKind, poll, read };
 
 use crate::{
     games::{rendering::{Renderable, Renderer}, snake}, renderer::CrossTermRenderer
@@ -19,14 +14,8 @@ mod renderer;
 mod games;
 
 fn main() {
-    terminal::enable_raw_mode().unwrap();
-
-    let (cols, rows) = terminal::size().unwrap();
-
-    let mut renderer = CrossTermRenderer::new(cols / 2, rows);
-    renderer.hide_cursor();
-
-    let mut game = snake::SnakeGame::new(cols / 2, rows);
+    let mut renderer = CrossTermRenderer::new();
+    let mut game = snake::SnakeGame::new(renderer.get_max_x() - 1, renderer.get_max_y() - 1);
 
     game.start_game();
 
@@ -53,19 +42,10 @@ fn main() {
         }
 
         if last_tick.elapsed() >= tick_rate {
-            renderer.clear();
-
             last_tick += tick_rate;
 
             game.update_game();
             game.render(&mut renderer);
         }
-
     }
-
-    renderer.clear();
-    renderer.flush();
-
-    renderer.show_cursor();
-    terminal::disable_raw_mode().unwrap();
 }

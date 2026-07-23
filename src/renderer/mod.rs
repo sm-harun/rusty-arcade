@@ -1,33 +1,40 @@
 use std::io::{Stdout, Write, stdout};
 
-use crossterm::{QueueableCommand, cursor::{self, MoveTo}, queue, style::{self, Color as CTCOLOR, Print, ResetColor, SetBackgroundColor, Stylize}, terminal::{Clear}};
+use crossterm::{QueueableCommand, cursor::{self, MoveTo}, queue, style::{self, Color as CTCOLOR, Print, ResetColor, SetBackgroundColor, Stylize}, terminal};
 
 use crate::games::{rendering::{Renderer, Color}};
 
 pub struct CrossTermRenderer {
     stdout: Stdout,
-    max_x: u16,
-    max_y: u16
+    screen_x: u16,
+    screen_y: u16
 }
 
 impl CrossTermRenderer {
-    pub fn new(max_x: u16, max_y: u16) -> CrossTermRenderer {
+    pub fn new() -> CrossTermRenderer {
+        terminal::enable_raw_mode().unwrap();
+
+        let mut new_stdout = stdout();
+        new_stdout.queue(cursor::Hide).unwrap();
+
+
+        let (cols, rows) = terminal::size().unwrap();
+
         CrossTermRenderer {
-            stdout: stdout(),
-            max_x,
-            max_y
+            stdout: new_stdout,
+            screen_x: cols,
+            screen_y: rows 
         }
     }
+}
 
-    pub fn clear(&mut self) {
-        self.stdout.queue(Clear(crossterm::terminal::ClearType::All)).unwrap();
-    }
+impl Drop for CrossTermRenderer {
+    fn drop(&mut self) {
+        terminal::disable_raw_mode().unwrap();
 
-    pub fn hide_cursor(&mut self) {
-        self.stdout.queue(cursor::Hide).unwrap();
-    }
+        self.clear();
+        self.flush();
 
-    pub fn show_cursor(&mut self) {
         self.stdout.queue(cursor::Show).unwrap();
     }
 }
@@ -46,19 +53,37 @@ impl Renderer for CrossTermRenderer {
     }
     
     fn write_text(&mut self, x: u16, y: u16, color: Color, text: &str) {
-        let colored_text = match color {
-            Color::Red => text.red(),
-            Color::Blue => text.blue(),
-            Color::Green => text.green(),
-            Color::White => text.white(),
-            Color::Black => text.black()
-        };
+        let lines: Vec<&str> = text.lines().collect();
 
-        self.stdout
-          .queue(cursor::MoveTo(x, y)).unwrap()
-          .queue(style::PrintStyledContent(colored_text)).unwrap();
+        let width = lines.iter().map(|line| line.chars().count()).max().unwrap_or(0);
+        let height = lines.len();
 
-        queue!(self.stdout, MoveTo(x, y), style::PrintStyledContent(colored_text)).unwrap();
+        let start_x = (x * 2).saturating_sub((width as u16) / 2);
+        let start_y = y.saturating_sub((height as u16) / 2);
+
+        for (i, line) in lines.iter().enumerate() {
+            let colored_line = match color {
+                Color::Red => line.red(),
+                Color::Blue => line.blue(),
+                Color::Green => line.green(),
+                Color::White => line.white(),
+                Color::Black => line.black(),
+            };
+
+            queue!(self.stdout, MoveTo(start_x, start_y + i as u16), style::PrintStyledContent(colored_line)).unwrap();
+        }
+    }
+
+    fn clear(&mut self) {
+        self.stdout.queue(terminal::Clear(terminal::ClearType::All)).unwrap();
+    }
+
+    fn get_max_x(&self) -> u16 {
+        self.screen_x / 2
+    }
+
+    fn get_max_y(&self) -> u16 {
+        self.screen_y
     }
 
     fn flush(&mut self) {
