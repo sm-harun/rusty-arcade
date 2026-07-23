@@ -1,161 +1,32 @@
-use std::{io::{Stdout, Write, stdout}, time::{Duration, Instant}};
-use crossterm::{QueueableCommand, cursor::{self, MoveTo}, event::{Event, KeyCode, KeyEventKind, poll, read}, execute, style::{self, Color, Print, ResetColor, SetBackgroundColor, Stylize}, terminal::{self, Clear, ClearType, enable_raw_mode}};
-
-#[derive(PartialEq, Eq)]
-enum Direction {
-    Up,
-    Down,
-    Left,
-    Right
-}
-
-#[derive(PartialEq)]
-enum GameState {
-    Running,
-    Paused,
-    Over
-}
-
-#[derive(PartialEq, Clone)]
-struct Position {
-    x: u16,
-    y: u16
-}
-
-struct Snake {
-    position: Position,
-    body: Vec<Position>,
-    direction: Direction,
-    max_x: u16,
-    max_y: u16
-}
-
-impl Snake {
-    fn new(x: u16, y: u16, max_x: u16, max_y: u16) -> Snake {
-        Snake {
-            position: Position {
-                x,
-                y
-            },
-            direction: Direction::Right,
-            body: vec![Position { x: x - 1, y }],
-            max_x,
-            max_y
-        }
+use std::{
+    io::{
+        Stdout, Write, stdout
+    },
+    time::{
+        Duration, Instant
     }
+};
 
-    fn move_snake(&mut self) {
-        self.body.insert(0, self.position.clone());
-
-        match self.direction {
-            Direction::Up => if self.position.y != 0 { self.position.y -= 1 },
-            Direction::Down => if self.position.y != self.max_y { self.position.y += 1 },
-            Direction::Left => if self.position.x != 0 { self.position.x -= 1 },
-            Direction::Right => if self.position.x != self.max_x { self.position.x += 1 }
-        }
-
-        print!("  X: {}", self.position.x);
-        print!("  Y: {}", self.position.y);
+use crossterm::{
+    QueueableCommand,
+    cursor::{
+        self, MoveTo
+    },
+    event::{
+        Event, KeyCode, KeyEventKind, poll, read
+    },
+    execute,
+    style::{
+        self, Color, Print, ResetColor, SetBackgroundColor, Stylize
+    },
+    terminal::{
+        self, Clear, ClearType, enable_raw_mode
     }
+};
 
-    fn change_direction(&mut self, direction: Direction) {
-        match direction {
-            Direction::Up => if self.direction != Direction::Down { self.direction = Direction::Up },
-            Direction::Down => if self.direction != Direction::Up { self.direction = Direction::Down },
-            Direction::Right => if self.direction != Direction::Left { self.direction = Direction::Right },
-            Direction::Left => if self.direction != Direction::Right { self.direction = Direction::Left },
-        }
-    }
+use crate::games::snake;
 
-    fn remove_last_cell(&mut self) {
-        self.body.pop();
-    }
-}
-
-struct Apple {
-    position: Position,
-    max_x: u16,
-    max_y: u16
-}
-
-impl Apple {
-    fn new(max_x: u16, max_y: u16) -> Apple {
-        Apple {
-            position: Position {
-                x:  rand::random_range(0..=max_x),
-                y: rand::random_range(0..=max_y),
-            },
-            max_x,
-            max_y
-        }
-    }
-
-    fn regenrate(&mut self) {
-        self.position.x = rand::random_range(0..=self.max_x);
-        self.position.y = rand::random_range(0..=self.max_y);
-    }
-}
-
-struct SnakeGame {
-    snake: Snake,
-    apple: Apple,
-    score: u32,
-    state: GameState,
-    max_x: u16,
-    max_y: u16
-}
-
-impl SnakeGame {
-    fn new(max_x: u16, max_y: u16) -> SnakeGame {
-        SnakeGame {
-            snake: Snake::new(max_x / 2, max_y / 2, max_x, max_y),
-            apple: Apple::new(max_x, max_y),
-            score: 0,
-            state: GameState::Over,
-            max_x,
-            max_y
-        }
-    }
-
-    fn start_game(&mut self) {
-        self.snake = Snake::new(self.max_x / 2, self.max_y / 2, self.max_x, self.max_y);
-        self.apple = Apple::new(self.max_x, self.max_y);
-        self.score = 0;
-
-        self.state = GameState::Running;
-    }
-
-    fn pause_game(&mut self) {
-        self.state = GameState::Paused;
-    }
-
-    fn unpause_game(&mut self) {
-        self.state = GameState::Running;
-    }
-
-    fn end_game(&mut self) {
-        self.state = GameState::Over;
-    }
-
-    fn update(&mut self) {
-        if self.state == GameState::Paused || self.state == GameState::Over { return (); }
-
-        if self.snake.body.iter().any(|cell| *cell == self.snake.position) {
-            self.end_game();
-        }
-
-        self.snake.move_snake();
-
-        if self.apple.position == self.snake.position {
-            self.apple.regenrate();
-            self.score += 1;
-
-            return ();
-        } 
-
-        self.snake.remove_last_cell();
-    }
-}
+mod games;
 
 struct Renderer {
     stdout: Stdout,
@@ -176,8 +47,8 @@ impl Renderer {
         execute!(self.stdout, MoveTo(x * 2, y), SetBackgroundColor(color), Print("  "), ResetColor).unwrap();
     }
 
-    fn update(&mut self, game: &SnakeGame) {
-        if game.state == GameState::Over {
+    fn update(&mut self, game: &snake::SnakeGame) {
+        if *game.state() == snake::GameState::Over {
             let text = "
                   ██████   █████  ███    ███ ███████     ███████ ██   ██ ████████ ██████  
                  ██       ██   ██ ████  ████ ██          ██   ██ ██   ██ ██       ██   ██ 
@@ -189,19 +60,19 @@ impl Renderer {
 
             self.write(&text.to_string(), self.max_x, 1);
 
-            self.write(&format!("Score: {}", game.score).to_string(), 16, 8);
+            self.write(&format!("Score: {}", game.score()).to_string(), 16, 8);
 
             return ();
         }
 
-        self.draw_cell(game.apple.position.x, game.apple.position.y, Color::Red);
-        self.draw_cell(game.snake.position.x, game.snake.position.y, Color::Green);
+        self.draw_cell(*game.apple().position_x(), *game.apple().position_y(), Color::Red);
+        self.draw_cell(*game.snake().position_x(), *game.snake().position_y(), Color::Green);
 
-        for cell in &game.snake.body {
-            self.draw_cell(cell.x, cell.y, Color::Blue);
+        for cell in game.snake().body() {
+            self.draw_cell(*cell.x(), *cell.y(), Color::Blue);
         }
 
-        if game.state == GameState::Paused {
+        if *game.state() == snake::GameState::Paused {
             let text = "
                   ██████   █████  ███    ███ ███████     ██████   █████  ██    ██ ███████ ███████ ██████ 
                  ██       ██   ██ ████  ████ ██          ██   ██ ██   ██ ██    ██ ██      ██      ██   ██
@@ -243,7 +114,7 @@ fn main() {
     let mut render = Renderer::new(cols / 2, rows);
     render.hide_cursor();
 
-    let mut game = SnakeGame::new(cols / 2, rows);
+    let mut game = snake::SnakeGame::new(cols / 2, rows);
 
     game.start_game();
 
@@ -255,22 +126,12 @@ fn main() {
             match read().unwrap() {
                 Event::Key(key) if key.kind == KeyEventKind::Press => {
                     match key.code {
-                        KeyCode::Char('w') => game.snake.change_direction(Direction::Up),
-                        KeyCode::Char('a') => game.snake.change_direction(Direction::Left),
-                        KeyCode::Char('s') => game.snake.change_direction(Direction::Down),
-                        KeyCode::Char('d') => game.snake.change_direction(Direction::Right),
-                        KeyCode::Enter => {
-                            if game.state == GameState::Over {
-                                game.start_game();
-                            }
-                        },
-                        KeyCode::Char(' ') =>  {
-                            if game.state == GameState::Paused {
-                                game.unpause_game();
-                            } else if game.state == GameState::Running {
-                                game.pause_game();
-                            }
-                        },
+                        KeyCode::Char('w') => game.change_direction(snake::Direction::Up),
+                        KeyCode::Char('a') => game.change_direction(snake::Direction::Left),
+                        KeyCode::Char('s') => game.change_direction(snake::Direction::Down),
+                        KeyCode::Char('d') => game.change_direction(snake::Direction::Right),
+                        KeyCode::Enter => game.restart_game(),
+                        KeyCode::Char(' ') =>  game.toggle_pause(),
                         KeyCode::Esc => break 'game,
                         _ => {}
                     }
@@ -284,7 +145,7 @@ fn main() {
 
             last_tick += tick_rate;
 
-            render.write(&format!("Score: {}", game.score).to_string(), 4, 2);
+            render.write(&format!("Score: {}", game.score()).to_string(), 4, 2);
 
             game.update();
             render.update(&game);
