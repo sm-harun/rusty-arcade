@@ -1,3 +1,5 @@
+use crate::{games::rendering::{Color, Renderable, Renderer }};
+
 #[derive(PartialEq, Eq)]
 pub enum Direction {
     Up,
@@ -186,7 +188,7 @@ impl SnakeGame {
         self.state = GameState::Over;
     }
 
-    pub fn update(&mut self) {
+    pub fn update_game(&mut self) {
         if self.state == GameState::Paused || self.state == GameState::Over { return (); }
 
         if self.snake.body.iter().any(|cell| *cell == self.snake.position) {
@@ -207,5 +209,51 @@ impl SnakeGame {
 
     pub fn change_direction(&mut self, direction: Direction) {
         self.snake.change_direction(direction);
+    }
+}
+
+impl Renderable for SnakeGame {
+    fn render(&self, renderer: &mut impl Renderer) {
+        if self.state == GameState::Over {
+            let text = "
+                  ██████   █████  ███    ███ ███████     ███████ ██   ██ ████████ ██████  
+                 ██       ██   ██ ████  ████ ██          ██   ██ ██   ██ ██       ██   ██ 
+                 ██   ███ ███████ ██ ████ ██ █████       ██   ██ ██   ██ ████████ ██████  
+                 ██    ██ ██   ██ ██  ██  ██ ██          ██   ██  ██ ██  ██       ██   ██ 
+                  ██████  ██   ██ ██      ██ ███████     ███████   ███    ███████ ██   ██ 
+            ";
+            let text = text.replace('\n', "\r\n");
+
+            renderer.write_text(self.max_x, 1, Color::White, &text.to_string());
+
+            renderer.write_text(16, 8, Color::White,&format!("Score: {}", self.score).to_string(),);
+
+            return ();
+        }
+
+        renderer.draw_cell(*self.apple.position_x(), *self.apple.position_y(), Color::Red);
+        renderer.draw_cell(*self.snake.position_x(), *self.snake.position_y(), Color::Green);
+
+        for cell in self.snake().body() {
+            renderer.draw_cell(*cell.x(), *cell.y(), Color::Blue);
+        }
+
+        if self.state == GameState::Paused {
+
+            let text = "
+                  ██████   █████  ███    ███ ███████     ██████   █████  ██    ██ ███████ ███████ ██████ 
+                 ██       ██   ██ ████  ████ ██          ██   ██ ██   ██ ██    ██ ██      ██      ██   ██
+                 ██   ███ ███████ ██ ████ ██ █████       ██████  ███████ ██    ██ ███████ █████   ██   ██
+                 ██    ██ ██   ██ ██  ██  ██ ██          ██      ██   ██ ██    ██      ██ ██      ██   ██
+                  ██████  ██   ██ ██      ██ ███████     ██      ██   ██  ██████  ███████ ███████ ██████
+            ";
+            let text = text.replace('\n', "\r\n");
+
+            renderer.write_text(self.max_x / 2, self.max_y / 2, Color::White, &text.to_string());
+        }
+
+        renderer.write_text(4, 2, Color::White, &format!("Score: {}", self.score).to_string());
+
+        renderer.flush();
     }
 }
